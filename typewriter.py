@@ -1,12 +1,12 @@
 # ---------------------------------------------------------------------------------
 # Name: Typewriter
 # Description: Type out a message character-by-character with a running caret
-# Author: @ogurchick
+# Author: @Samtakoiiii
 # ---------------------------------------------------------------------------------
 # 🔒    Licensed under the GNU AGPLv3
 # 🌐 https://www.gnu.org/licenses/agpl-3.0.html
 # ---------------------------------------------------------------------------------
-# meta developer: @ogurchick
+# meta developer: @Samtakoiiii
 # scope: hikka_only
 # ---------------------------------------------------------------------------------
 
@@ -14,6 +14,8 @@ __version__ = (1, 1, 0)
 
 import asyncio
 import html
+
+from herokutl.errors.rpcerrorlist import MessageNotModifiedError
 
 from .. import loader, utils
 
@@ -108,6 +110,9 @@ class TypewriterMod(loader.Module):
     async def _edit(self, message, text: str, caret: str) -> bool:
         try:
             await utils.answer(message, self._render(text, caret))
+            return True
+        except MessageNotModifiedError:
+            # identical content (e.g. blinking caret or final state) — not an error
             return True
         except Exception as e:
             wait = getattr(e, "seconds", None)
