@@ -15,8 +15,6 @@ __version__ = (1, 1, 0)
 import asyncio
 import html
 
-from herokutl.errors.rpcerrorlist import MessageNotModifiedError
-
 from .. import loader, utils
 
 PUNCT = set(".,!?;:…")
@@ -36,6 +34,8 @@ class TypewriterMod(loader.Module):
         "no_text": "🚫 <b>Дай текст:</b> <code>.type твой текст</code>",
         "flood": "⏳ <b>FloodWait {}s — подними настройку</b> <code>delay</code><b>.</b>",
     }
+
+    _last = None
 
     def __init__(self):
         self.config = loader.ModuleConfig(
@@ -108,13 +108,20 @@ class TypewriterMod(loader.Module):
         return body
 
     async def _edit(self, message, text: str, caret: str) -> bool:
-        try:
-            await utils.answer(message, self._render(text, caret))
+        rendered = self._render(text, caret)
+        # Skip if identical to what we last sent — avoids MessageNotModified entirely.
+        if rendered == self._last:
             return True
-        except MessageNotModifiedError:
-            # identical content (e.g. blinking caret or final state) — not an error
+        try:
+            await utils.answer(message, rendered)
+            self._last = rendered
             return True
         except Exception as e:
+            # MessageNotModified: identical content — harmless, keep going.
+            # Match by name so it works regardless of import path / wrapping.
+            if "NotModified" in type(e).__name__:
+                self._last = rendered
+                return True
             wait = getattr(e, "seconds", None)
             if wait:
                 await utils.answer(message, self.strings["flood"].format(wait))
@@ -186,6 +193,8 @@ class TypewriterMod(loader.Module):
         if mode not in ("type", "untype", "both"):
             mode = "type"
         caret = self.config["caret"]
+
+        self._last = None  # reset dedup cache for this run
 
         # show prefix + caret, pause for drama
         await self._edit(message, prefix, caret)
